@@ -97,7 +97,6 @@ impl Screen {
     fn rewrap_lines(
         &mut self,
         physical_cols: usize,
-        physical_rows: usize,
         cursor_x: usize,
         cursor_y: PhysRowIndex,
         seqno: SequenceNo,
@@ -228,7 +227,7 @@ impl Screen {
             // screen (hence the check for allow_scrollback), to avoid
             // conflicting screen updates with full screen apps.
             if self.allow_scrollback {
-                self.rewrap_lines(physical_cols, physical_rows, cursor.x, cursor_phys, seqno)
+                self.rewrap_lines(physical_cols, cursor.x, cursor_phys, seqno)
             } else {
                 for line in &mut self.lines {
                     if physical_cols < self.physical_cols {

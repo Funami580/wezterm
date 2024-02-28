@@ -227,6 +227,7 @@ impl Line {
 
             lines
         } else {
+            cells.truncate(0);
             vec![self]
         }
     }
@@ -955,11 +956,19 @@ impl Line {
 
         let def_attr = CellAttributes::blank();
         let cells = self.coerce_vec_storage();
-        if let Some(end_idx) = cells
+        let truncate_len = if let Some(end_idx) = cells
             .iter()
             .rposition(|c| c.str() != " " || c.attrs() != &def_attr)
         {
-            cells.resize_with(end_idx + 1, Cell::blank);
+            Some(end_idx + 1)
+        } else if !cells.is_empty() {
+            Some(0)
+        } else {
+            None
+        };
+
+        if let Some(truncate_len) = truncate_len {
+            cells.truncate(truncate_len);
             self.update_last_change_seqno(seqno);
             self.invalidate_zones();
         }
