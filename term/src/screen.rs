@@ -158,6 +158,10 @@ impl Screen {
         while rewrapped.iter().rev().skip(1).next().map(Line::last_cell_was_wrapped).unwrap_or(false)
             && rewrapped.back().map(|line| line.visible_cells().all(|cell| !cell.attrs().edited())).unwrap_or(false) {
             rewrapped.pop_back();
+
+            if let Some(prev_line) = rewrapped.back_mut() {
+                prev_line.set_last_cell_was_wrapped(false, seqno);
+            }
         }
 
         if cursor_associated_with_line {
@@ -204,6 +208,12 @@ impl Screen {
         for _ in cursor_phys + 1..self.lines.len() {
             if self.lines.back().map(|line| line.len() == 0).unwrap_or(false) {
                 self.lines.pop_back();
+
+                if let Some(prev_line) = self.lines.back_mut() {
+                    if prev_line.last_cell_was_wrapped() {
+                        prev_line.set_last_cell_was_wrapped(false, seqno);
+                    }
+                }
             } else {
                 break;
             }
