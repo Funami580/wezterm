@@ -106,6 +106,7 @@ impl Screen {
         let mut logical_cursor_x: Option<usize> = None;
         let mut adjusted_cursor = (cursor_x, cursor_y);
         let mut cursor_associated_with_line = false;
+        let mut cursor_associated_with_current_line = false;
 
         for (phys_idx, mut line) in self.lines.drain(..).enumerate() {
             line.update_last_change_seqno(seqno);
@@ -136,13 +137,12 @@ impl Screen {
                 let last_x = x - ((num_lines - 1) * physical_cols);
                 adjusted_cursor = (last_x, rewrapped.len() + num_lines - 1);
                 cursor_associated_with_line = true;
+                cursor_associated_with_current_line = true;
             }
 
             if was_wrapped {
                 logical_line.replace(line);
                 continue;
-            } else {
-                logical_line = None;
             }
 
             if line.len() <= physical_cols {
@@ -152,24 +152,33 @@ impl Screen {
                     rewrapped.push_back(line);
                 }
             }
-        }
 
-        while rewrapped.iter().rev().skip(1).next().map(Line::last_cell_was_wrapped).unwrap_or(false)
-            && rewrapped.back().map(|line| line.visible_cells().all(|cell| !cell.attrs().edited())).unwrap_or(false) {
-            rewrapped.pop_back();
+            if cursor_associated_with_current_line {
+                if adjusted_cursor.1 == rewrapped.len() {
+                    if let Some(last_line) = rewrapped.back_mut() {
+                        last_line.set_last_cell_was_wrapped(true, seqno);
+                    }
 
-            if let Some(prev_line) = rewrapped.back_mut() {
-                prev_line.set_last_cell_was_wrapped(false, seqno);
+                    rewrapped.push_back(Line::new(seqno));
+                }
+
+                cursor_associated_with_current_line = false;
             }
         }
 
-        if cursor_associated_with_line {
-            while adjusted_cursor.1 >= rewrapped.len() {
-                if let Some(last_line) = rewrapped.back_mut() {
-                    last_line.set_last_cell_was_wrapped(true, seqno);
-                }
+        loop {
+            let prev_last_is_wrapped = rewrapped.iter().rev().skip(1).next().map(Line::last_cell_was_wrapped).unwrap_or(false);
+            let last_is_unused = rewrapped.back().map(|line| line.visible_cells().all(|cell| !cell.attrs().edited())).unwrap_or(false);
+            let last_is_cursor_line = cursor_associated_with_line && adjusted_cursor.1 + 1 == rewrapped.len();
 
-                rewrapped.push_back(Line::new(seqno));
+            if prev_last_is_wrapped && last_is_unused && !last_is_cursor_line {
+                rewrapped.pop_back();
+
+                if let Some(prev_line) = rewrapped.back_mut() {
+                    prev_line.set_last_cell_was_wrapped(false, seqno);
+                }
+            } else {
+                break;
             }
         }
 
